@@ -15,13 +15,14 @@ interface TopBarProps {
   showBack?: boolean;
   actions?: { label: string; onClick: () => void; variant?: "destructive" }[];
   rightContent?: React.ReactNode;
+  sticky?: boolean;
 }
 
-export function TopBar({ title, showBack, actions, rightContent }: TopBarProps) {
+export function TopBar({ title, showBack, actions, rightContent, sticky = true }: TopBarProps) {
   const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-lg">
+    <header className={`${sticky ? "sticky top-0 z-40" : ""} border-b bg-background/80 backdrop-blur-lg`}>
       <div className="mx-auto flex h-14 max-w-md items-center gap-3 px-4">
         {showBack && (
           <Button

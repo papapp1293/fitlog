@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Check } from "lucide-react";
@@ -58,14 +58,33 @@ export function SetTable({
     rir: string;
   }>({ weight: "", reps: "", rir: "" });
   const [saving, setSaving] = useState(false);
+  const newSetRowRef = useRef<HTMLDivElement>(null);
 
-  const nextSetNumber =
-    sets.length > 0 ? Math.max(...sets.map((s) => s.setNumber)) + 1 : 1;
+  // For unilateral exercises, pair set numbers: 1L, 1R, 2L, 2R
+  // Next set number = max set number + 1, unless last set's side is "L" (then same number for "R")
+  const lastSet = sets.length > 0 ? sets[sets.length - 1] : null;
+  const nextSetNumber = (() => {
+    if (sets.length === 0) return 1;
+    const maxSetNum = Math.max(...sets.map((s) => s.setNumber));
+    if (isUnilateral && lastSet?.side === "L") return maxSetNum;
+    return maxSetNum + 1;
+  })();
+
+  // Suggest which side to log next for unilateral exercises
+  const suggestedSide: "L" | "R" | null = (() => {
+    if (!isUnilateral) return null;
+    if (!lastSet?.side || lastSet.side === "R") return "L";
+    return "R";
+  })();
 
   // Find matching previous set for autofill
   const prevSet = previousSets?.find((p) => p.setNumber === nextSetNumber);
 
+  // Whether the user has typed anything or there are previous values to autofill
+  const hasValues = newSet.weight !== "" || newSet.reps !== "" || prevSet != null;
+
   async function handleAddSet(side?: "L" | "R") {
+    if (saving) return;
     setSaving(true);
     await onLogSet(nextSetNumber, {
       weight: newSet.weight
@@ -81,6 +100,20 @@ export function SetTable({
     });
     setNewSet({ weight: "", reps: "", rir: "" });
     setSaving(false);
+  }
+
+  // Auto-submit when focus leaves the new set row entirely
+  function handleNewSetBlur(e: React.FocusEvent) {
+    // Check if the new focus target is still inside the new set row
+    const row = newSetRowRef.current;
+    if (!row) return;
+    // relatedTarget is where focus is going
+    const next = e.relatedTarget as Node | null;
+    if (next && row.contains(next)) return; // still inside, don't submit
+
+    // Only auto-submit for bilateral; unilateral needs explicit L/R choice
+    if (isUnilateral || !hasValues) return;
+    handleAddSet();
   }
 
   return (
@@ -104,8 +137,12 @@ export function SetTable({
         />
       ))}
 
-      {/* New set input with previous-set placeholders */}
-      <div className="grid grid-cols-[3rem_1fr_1fr_1fr_2.5rem] gap-1 items-center px-3 py-2 bg-muted/30">
+      {/* New set input with previous-set placeholders — auto-submits on blur for bilateral */}
+      <div
+        ref={newSetRowRef}
+        onBlur={handleNewSetBlur}
+        className="grid grid-cols-[3rem_1fr_1fr_1fr_2.5rem] gap-1 items-center px-3 py-2 bg-muted/30"
+      >
         <span className="text-sm font-medium text-muted-foreground">
           {nextSetNumber}
         </span>
@@ -159,7 +196,7 @@ export function SetTable({
         {isUnilateral ? (
           <div className="grid grid-cols-2 gap-2">
             <Button
-              variant="outline"
+              variant={suggestedSide === "L" ? "default" : "outline"}
               size="sm"
               className="gap-1"
               onClick={() => handleAddSet("L")}
@@ -169,7 +206,7 @@ export function SetTable({
               Left
             </Button>
             <Button
-              variant="outline"
+              variant={suggestedSide === "R" ? "default" : "outline"}
               size="sm"
               className="gap-1"
               onClick={() => handleAddSet("R")}
@@ -196,6 +233,8 @@ export function SetTable({
   );
 }
 
+const AUTO_SAVE_DELAY = 1500; // ms
+
 function EditableSetRow({
   set,
   onUpdate,
@@ -213,35 +252,78 @@ function EditableSetRow({
   >(null);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFieldRef = useRef<"weight" | "reps" | "rir" | null>(null);
 
   function startEdit(field: "weight" | "reps" | "rir") {
+    // Commit any pending debounced save for a different field
+    if (pendingFieldRef.current && pendingFieldRef.current !== field) {
+      flushSave();
+    }
     const current = set[field];
     setEditingField(field);
+    pendingFieldRef.current = field;
     setEditValue(current != null ? String(current) : "");
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
-  async function commitEdit() {
-    if (editingField === null) return;
-    const field = editingField;
-    setEditingField(null);
+  const saveField = useCallback(
+    (field: "weight" | "reps" | "rir", value: string) => {
+      const numValue = value === "" ? null : Number(value);
+      const currentValue = set[field];
+      if (numValue !== currentValue) {
+        onUpdate(set.id, { [field]: numValue });
+      }
+    },
+    [set, onUpdate]
+  );
 
-    const numValue = editValue === "" ? null : Number(editValue);
-    const currentValue = set[field];
-
-    // Only update if value actually changed
-    if (numValue !== currentValue) {
-      await onUpdate(set.id, { [field]: numValue });
+  function flushSave() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     }
+    if (pendingFieldRef.current) {
+      saveField(pendingFieldRef.current, editValue);
+      pendingFieldRef.current = null;
+    }
+  }
+
+  function handleChange(value: string) {
+    setEditValue(value);
+    // Debounce auto-save while typing
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (editingField) {
+        saveField(editingField, value);
+      }
+    }, AUTO_SAVE_DELAY);
+  }
+
+  function commitEdit() {
+    if (editingField === null) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    saveField(editingField, editValue);
+    pendingFieldRef.current = null;
+    setEditingField(null);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") {
       commitEdit();
     } else if (e.key === "Escape") {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      pendingFieldRef.current = null;
       setEditingField(null);
     }
   }
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   function renderCell(field: "weight" | "reps" | "rir", className: string) {
     const value = set[field];
@@ -253,7 +335,7 @@ function EditableSetRow({
           type="number"
           inputMode={field === "weight" ? "decimal" : "numeric"}
           value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onBlur={commitEdit}
           onKeyDown={handleKeyDown}
           className="h-7 text-sm"

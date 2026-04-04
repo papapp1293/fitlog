@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useCallback, useTransition } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/layout/top-bar";
 import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
-import { Plus, Timer } from "lucide-react";
+import { Plus, Timer, Trash2 } from "lucide-react";
 import {
   getWorkoutSession,
   endWorkout,
   deleteWorkoutSession,
+  addExerciseToSession,
+  removeExerciseFromSession,
 } from "@/actions/workout";
 import { logSet, deleteSet, updateSet, getPreviousSets } from "@/actions/sets";
+import { ExercisePickerDialog } from "@/components/workout/exercise-picker-dialog";
+import { RestTimePicker } from "@/components/workout/rest-time-picker";
+import { REST_TIMER_PRESETS } from "@/lib/constants";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useWorkoutTimer } from "@/hooks/use-workout-timer";
 import { useRestTimer } from "@/hooks/use-rest-timer";
@@ -52,6 +57,8 @@ interface PreviousSetData {
   side: string | null;
 }
 
+const SESSION_KEY = (id: string) => ["workout-session", id] as const;
+
 export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,10 +67,17 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
   const setActiveSession = useWorkoutStore((s) => s.setActiveSession);
   const clearActiveSession = useWorkoutStore((s) => s.clearActiveSession);
   const startRestTimer = useWorkoutStore((s) => s.startRestTimer);
+  const clearRestTimer = useWorkoutStore((s) => s.clearRestTimer);
+  const restDuration = useWorkoutStore((s) => s.restDuration);
+  const setRestDuration = useWorkoutStore((s) => s.setRestDuration);
   const [isPending, startTransition] = useTransition();
+  const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+
+  const queryKey = SESSION_KEY(sessionId);
 
   const { data: session, isLoading } = useQuery<WorkoutSessionData | null>({
-    queryKey: ["workout-session", sessionId],
+    queryKey,
     queryFn: () => getWorkoutSession(sessionId),
   });
 
@@ -90,6 +104,180 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
     },
     enabled: exerciseIds.length > 0,
   });
+
+  // --- Optimistic mutations ---
+
+  const logSetMutation = useMutation({
+    mutationFn: (input: {
+      sessionExerciseId: string;
+      setNumber: number;
+      weight?: number | null;
+      reps?: number | null;
+      rir?: number | null;
+      side?: "L" | "R" | null;
+    }) => logSet(input),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WorkoutSessionData | null>(queryKey);
+
+      queryClient.setQueryData<WorkoutSessionData | null>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          exercises: old.exercises.map((ex) =>
+            ex.id === input.sessionExerciseId
+              ? {
+                  ...ex,
+                  sets: [
+                    ...ex.sets,
+                    {
+                      id: `optimistic-${Date.now()}`,
+                      setNumber: input.setNumber,
+                      weight: input.weight ?? null,
+                      reps: input.reps ?? null,
+                      rir: input.rir ?? null,
+                      side: input.side ?? null,
+                      completed: true,
+                    },
+                  ],
+                }
+              : ex
+          ),
+        };
+      });
+
+      startRestTimer();
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error("Failed to log set");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const updateSetMutation = useMutation({
+    mutationFn: (input: {
+      id: string;
+      weight?: number | null;
+      reps?: number | null;
+      rir?: number | null;
+    }) => updateSet(input),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WorkoutSessionData | null>(queryKey);
+
+      queryClient.setQueryData<WorkoutSessionData | null>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          exercises: old.exercises.map((ex) => ({
+            ...ex,
+            sets: ex.sets.map((s) =>
+              s.id === input.id
+                ? {
+                    ...s,
+                    ...(input.weight !== undefined && { weight: input.weight }),
+                    ...(input.reps !== undefined && { reps: input.reps }),
+                    ...(input.rir !== undefined && { rir: input.rir }),
+                  }
+                : s
+            ),
+          })),
+        };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error("Failed to update set");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const deleteSetMutation = useMutation({
+    mutationFn: (setId: string) => deleteSet(setId),
+    onMutate: async (setId) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WorkoutSessionData | null>(queryKey);
+
+      queryClient.setQueryData<WorkoutSessionData | null>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          exercises: old.exercises.map((ex) => ({
+            ...ex,
+            sets: ex.sets.filter((s) => s.id !== setId),
+          })),
+        };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error("Failed to delete set");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const addExerciseMutation = useMutation({
+    mutationFn: (exerciseId: string) => addExerciseToSession(sessionId, exerciseId),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey });
+        queryClient.invalidateQueries({ queryKey: ["previous-sets"] });
+        toast.success("Exercise added");
+      } else {
+        toast.error(result.error);
+      }
+    },
+    onError: () => {
+      toast.error("Failed to add exercise");
+    },
+  });
+
+  const removeExerciseMutation = useMutation({
+    mutationFn: (sessionExerciseId: string) => removeExerciseFromSession(sessionExerciseId),
+    onMutate: async (sessionExerciseId) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<WorkoutSessionData | null>(queryKey);
+
+      queryClient.setQueryData<WorkoutSessionData | null>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          exercises: old.exercises.filter((ex) => ex.id !== sessionExerciseId),
+        };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error("Failed to remove exercise");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  // --- Handlers ---
 
   function handleEndWorkout() {
     startTransition(async () => {
@@ -118,50 +306,44 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
     });
   }
 
-  async function handleLogSet(
-    sessionExerciseId: string,
-    setNumber: number,
-    data: { weight?: number | null; reps?: number | null; rir?: number | null; side?: "L" | "R" | null }
-  ) {
-    const result = await logSet({
-      sessionExerciseId,
-      setNumber,
-      ...data,
-    });
-    if (result.success) {
-      startRestTimer();
-      queryClient.invalidateQueries({
-        queryKey: ["workout-session", sessionId],
-      });
-    } else {
-      toast.error(result.error);
-    }
+  const handleLogSet = useCallback(
+    async (
+      sessionExerciseId: string,
+      setNumber: number,
+      data: { weight?: number | null; reps?: number | null; rir?: number | null; side?: "L" | "R" | null }
+    ) => {
+      logSetMutation.mutate({ sessionExerciseId, setNumber, ...data });
+    },
+    [logSetMutation]
+  );
+
+  const handleUpdateSet = useCallback(
+    async (
+      setId: string,
+      data: { weight?: number | null; reps?: number | null; rir?: number | null }
+    ) => {
+      updateSetMutation.mutate({ id: setId, ...data });
+    },
+    [updateSetMutation]
+  );
+
+  const handleDeleteSet = useCallback(
+    async (setId: string) => {
+      deleteSetMutation.mutate(setId);
+    },
+    [deleteSetMutation]
+  );
+
+  function handleAddExercise(exerciseId: string) {
+    setExercisePickerOpen(false);
+    addExerciseMutation.mutate(exerciseId);
   }
 
-  async function handleUpdateSet(
-    setId: string,
-    data: { weight?: number | null; reps?: number | null; rir?: number | null }
-  ) {
-    const result = await updateSet({ id: setId, ...data });
-    if (result.success) {
-      queryClient.invalidateQueries({
-        queryKey: ["workout-session", sessionId],
-      });
-    } else {
-      toast.error(result.error);
-    }
+  function handleRemoveExercise(sessionExerciseId: string) {
+    removeExerciseMutation.mutate(sessionExerciseId);
   }
 
-  async function handleDeleteSet(setId: string) {
-    const result = await deleteSet(setId);
-    if (result.success) {
-      queryClient.invalidateQueries({
-        queryKey: ["workout-session", sessionId],
-      });
-    } else {
-      toast.error(result.error);
-    }
-  }
+  // --- Render ---
 
   if (isLoading) {
     return (
@@ -191,35 +373,93 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <TopBar
-        title={session.workoutType.name}
-        showBack
-        rightContent={
-          <div className="flex items-center gap-2 text-sm">
-            <Timer className="h-4 w-4 text-muted-foreground" />
-            <span className="font-mono tabular-nums">{timerFormatted}</span>
-          </div>
-        }
-        actions={[
-          { label: "End Workout", onClick: handleEndWorkout },
-          {
-            label: "Delete Session",
-            onClick: handleDeleteSession,
-            variant: "destructive",
-          },
-        ]}
-      />
+      {/* Combined sticky header: TopBar + rest timer */}
+      <div className="sticky top-0 z-40">
+        <TopBar
+          title={session.workoutType.name}
+          showBack
+          sticky={false}
+          rightContent={
+            <div className="flex items-center gap-2 text-sm">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              <span className="font-mono tabular-nums">{timerFormatted}</span>
+            </div>
+          }
+          actions={[
+            { label: "End Workout", onClick: handleEndWorkout },
+            {
+              label: "Delete Session",
+              onClick: handleDeleteSession,
+              variant: "destructive",
+            },
+          ]}
+        />
 
-      {restActive && (
-        <div className="sticky top-14 z-30 border-b bg-primary/10 backdrop-blur-lg">
-          <div className="mx-auto flex max-w-md items-center justify-center gap-2 py-2 text-sm">
-            <span className="text-muted-foreground">Rest</span>
-            <span className="font-mono text-lg font-bold tabular-nums">
-              {restFormatted}
-            </span>
+        {/* Rest timer — sits directly under TopBar in the same sticky block */}
+        <div className={`border-b backdrop-blur-lg ${restActive ? "bg-primary/10" : "bg-card/80"}`}>
+          {restActive && (
+            <div className="mx-auto flex max-w-md items-center justify-between px-4 py-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  const end = useWorkoutStore.getState().restTimerEnd;
+                  if (end) {
+                    useWorkoutStore.setState({ restTimerEnd: end + 30_000 });
+                  }
+                }}
+              >
+                +30s
+              </Button>
+              <button
+                className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-accent active:scale-95"
+                onClick={() => setTimePickerOpen(true)}
+              >
+                <span className="text-sm text-muted-foreground">Rest</span>
+                <span className="font-mono text-lg font-bold tabular-nums">
+                  {restFormatted}
+                </span>
+              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={clearRestTimer}
+              >
+                Skip
+              </Button>
+            </div>
+          )}
+
+          <div className="mx-auto flex max-w-md items-center gap-1 justify-center px-4 py-1">
+            {REST_TIMER_PRESETS.map((seconds) => (
+              <Button
+                key={seconds}
+                variant={restDuration === seconds ? "default" : "ghost"}
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  setRestDuration(seconds);
+                  if (restActive) startRestTimer(seconds);
+                }}
+              >
+                {seconds >= 60 ? `${seconds / 60}m` : `${seconds}s`}
+              </Button>
+            ))}
+            <Button
+              variant={!REST_TIMER_PRESETS.includes(restDuration as typeof REST_TIMER_PRESETS[number]) ? "default" : "ghost"}
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => setTimePickerOpen(true)}
+            >
+              {!REST_TIMER_PRESETS.includes(restDuration as typeof REST_TIMER_PRESETS[number])
+                ? formatDuration(restDuration)
+                : "Custom"}
+            </Button>
           </div>
         </div>
-      )}
+      </div>
 
       <PageContainer className="py-4 space-y-6" bottomNavPadding={false}>
         {session.exercises.map((sessionExercise, index) => (
@@ -228,7 +468,15 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                 {index + 1}
               </span>
-              <h3 className="font-semibold">{sessionExercise.exercise.name}</h3>
+              <h3 className="flex-1 font-semibold">{sessionExercise.exercise.name}</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => handleRemoveExercise(sessionExercise.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
             </div>
 
             <SetTable
@@ -249,6 +497,7 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
           <Button
             variant="outline"
             className="w-full gap-2"
+            onClick={() => setExercisePickerOpen(true)}
             disabled={isPending}
           >
             <Plus className="h-4 w-4" />
@@ -264,7 +513,33 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
             {isPending ? "Finishing..." : "Finish Workout"}
           </Button>
         </div>
+
+        <ExercisePickerDialog
+          open={exercisePickerOpen}
+          onOpenChange={setExercisePickerOpen}
+          onSelect={handleAddExercise}
+          excludeIds={session.exercises.map((e) => e.exercise.id)}
+        />
       </PageContainer>
+
+      <RestTimePicker
+        open={timePickerOpen}
+        onClose={() => setTimePickerOpen(false)}
+        onConfirm={(seconds) => {
+          setRestDuration(seconds);
+          if (restActive) startRestTimer(seconds);
+          setTimePickerOpen(false);
+        }}
+      />
     </>
   );
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${m}m`;
+  }
+  return `${seconds}s`;
 }

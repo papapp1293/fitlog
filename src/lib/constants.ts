@@ -1,4 +1,5 @@
 export const DEFAULT_REST_TIMER_SECONDS = 180; // 3 minutes
+export const REST_TIMER_PRESETS = [60, 90, 120, 180, 300] as const;
 export const APP_NAME = "Gym Tracker";
 export const MUSCLE_GROUPS = [
   "Chest",
