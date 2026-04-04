@@ -15,9 +15,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, BarChart3 } from "lucide-react";
+import Link from "next/link";
 import { getExercises, createExercise, deleteExercise } from "@/actions/exercise";
 import { MUSCLE_GROUPS } from "@/lib/constants";
+import { ExerciseListSkeleton } from "@/components/skeletons/exercise-list-skeleton";
 import { toast } from "sonner";
 
 interface ExerciseItem {
@@ -57,12 +59,7 @@ export function ExercisesScreen() {
 
         <div className="space-y-2">
           {isLoading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-16 animate-pulse rounded-xl bg-muted"
-              />
-            ))
+            <ExerciseListSkeleton />
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">
               {search ? "No exercises found" : "No exercises yet. Create one!"}
@@ -136,6 +133,15 @@ function ExerciseRow({
           )}
         </div>
       </div>
+      <Link href={`/exercises/${exercise.id}/history`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <BarChart3 className="h-4 w-4" />
+        </Button>
+      </Link>
       <Button
         variant="ghost"
         size="icon"
