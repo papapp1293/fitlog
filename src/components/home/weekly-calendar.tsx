@@ -2,7 +2,11 @@
 
 import { cn } from "@/lib/utils";
 
-export function WeeklyCalendar() {
+interface WeeklyCalendarProps {
+  workoutDates?: string[];
+}
+
+export function WeeklyCalendar({ workoutDates = [] }: WeeklyCalendarProps) {
   const today = new Date();
   const dayOfWeek = today.getDay();
 
@@ -18,6 +22,8 @@ export function WeeklyCalendar() {
 
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+  const workoutDateSet = new Set(workoutDates);
+
   return (
     <section className="space-y-2">
       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
@@ -27,6 +33,8 @@ export function WeeklyCalendar() {
         {days.map((date, i) => {
           const isToday = date.toDateString() === today.toDateString();
           const isPast = date < today && !isToday;
+          const dateStr = date.toISOString().split("T")[0];
+          const hasWorkout = workoutDateSet.has(dateStr);
 
           return (
             <div
@@ -44,6 +52,14 @@ export function WeeklyCalendar() {
                 {dayNames[i]}
               </span>
               <span className="text-sm font-semibold">{date.getDate()}</span>
+              {hasWorkout && (
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    isToday ? "bg-primary-foreground" : "bg-primary"
+                  )}
+                />
+              )}
             </div>
           );
         })}

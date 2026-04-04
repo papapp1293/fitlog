@@ -1,12 +1,39 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { PageContainer } from "@/components/layout/page-container";
 import { WeeklyCalendar } from "@/components/home/weekly-calendar";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, Plus } from "lucide-react";
+import { Dumbbell, Plus, Play, Timer } from "lucide-react";
 import Link from "next/link";
+import { getWeeklyStats, getWorkoutDates } from "@/actions/workout";
+import { useWorkoutStore } from "@/stores/workout-store";
+import { useWorkoutTimer } from "@/hooks/use-workout-timer";
+
+function getMonday() {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  return monday.toISOString().split("T")[0];
+}
 
 export function HomeScreen() {
+  const mondayStr = getMonday();
+  const activeSessionId = useWorkoutStore((s) => s.activeSessionId);
+  const { formatted: timerFormatted } = useWorkoutTimer();
+
+  const { data: stats } = useQuery({
+    queryKey: ["weekly-stats"],
+    queryFn: () => getWeeklyStats(),
+  });
+
+  const { data: workoutDates = [] } = useQuery({
+    queryKey: ["workout-dates", mondayStr],
+    queryFn: () => getWorkoutDates(mondayStr),
+  });
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-lg">
@@ -17,22 +44,49 @@ export function HomeScreen() {
       </header>
 
       <PageContainer className="py-6 space-y-6">
-        <WeeklyCalendar />
+        <WeeklyCalendar workoutDates={workoutDates} />
 
-        <Link href="/workout">
-          <Button className="w-full h-14 text-lg font-semibold gap-2" size="lg">
-            <Plus className="h-5 w-5" />
-            Start Training
-          </Button>
-        </Link>
+        {activeSessionId ? (
+          <Link href={`/workout/${activeSessionId}`}>
+            <Button
+              className="w-full h-14 text-lg font-semibold gap-3"
+              size="lg"
+            >
+              <Play className="h-5 w-5" />
+              Resume Workout
+              <span className="ml-auto flex items-center gap-1.5 text-sm font-mono tabular-nums opacity-80">
+                <Timer className="h-4 w-4" />
+                {timerFormatted}
+              </span>
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/workout">
+            <Button
+              className="w-full h-14 text-lg font-semibold gap-2"
+              size="lg"
+            >
+              <Plus className="h-5 w-5" />
+              Start Training
+            </Button>
+          </Link>
+        )}
 
-        <section className="space-y-3">
+        <section className="space-y-3 pt-4">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             Quick Stats
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="This Week" value="0" unit="workouts" />
-            <StatCard label="This Month" value="0" unit="workouts" />
+            <StatCard
+              label="This Week"
+              value={String(stats?.weekCount ?? 0)}
+              unit="workouts"
+            />
+            <StatCard
+              label="This Month"
+              value={String(stats?.monthCount ?? 0)}
+              unit="workouts"
+            />
           </div>
         </section>
       </PageContainer>

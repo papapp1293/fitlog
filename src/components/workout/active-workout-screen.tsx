@@ -12,7 +12,7 @@ import {
   endWorkout,
   deleteWorkoutSession,
 } from "@/actions/workout";
-import { logSet, deleteSet } from "@/actions/sets";
+import { logSet, deleteSet, updateSet, getPreviousSets } from "@/actions/sets";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useWorkoutTimer } from "@/hooks/use-workout-timer";
 import { useRestTimer } from "@/hooks/use-rest-timer";
@@ -44,6 +44,14 @@ interface WorkoutSessionData {
   notes: string | null;
 }
 
+interface PreviousSetData {
+  setNumber: number;
+  weight: number | null;
+  reps: number | null;
+  rir: number | null;
+  side: string | null;
+}
+
 export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -54,13 +62,33 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
   const startRestTimer = useWorkoutStore((s) => s.startRestTimer);
   const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    setActiveSession(sessionId);
-  }, [sessionId, setActiveSession]);
-
   const { data: session, isLoading } = useQuery<WorkoutSessionData | null>({
     queryKey: ["workout-session", sessionId],
     queryFn: () => getWorkoutSession(sessionId),
+  });
+
+  // Sync store with DB start time so timer is accurate on resume
+  useEffect(() => {
+    if (session) {
+      setActiveSession(sessionId, new Date(session.startedAt).getTime());
+    }
+  }, [session, sessionId, setActiveSession]);
+
+  // Fetch previous sets for all exercises in the session
+  const exerciseIds = session?.exercises.map((e) => e.exercise.id) ?? [];
+  const { data: previousSetsMap = {} } = useQuery<Record<string, PreviousSetData[]>>({
+    queryKey: ["previous-sets", exerciseIds.join(",")],
+    queryFn: async () => {
+      if (exerciseIds.length === 0) return {};
+      const entries = await Promise.all(
+        exerciseIds.map(async (id) => {
+          const sets = await getPreviousSets(id);
+          return [id, sets] as const;
+        })
+      );
+      return Object.fromEntries(entries);
+    },
+    enabled: exerciseIds.length > 0,
   });
 
   function handleEndWorkout() {
@@ -68,6 +96,8 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
       const result = await endWorkout({ sessionId });
       if (result.success) {
         clearActiveSession();
+        queryClient.invalidateQueries({ queryKey: ["weekly-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["workout-dates"] });
         toast.success("Workout complete!");
         router.push("/");
       } else {
@@ -100,6 +130,20 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
     });
     if (result.success) {
       startRestTimer();
+      queryClient.invalidateQueries({
+        queryKey: ["workout-session", sessionId],
+      });
+    } else {
+      toast.error(result.error);
+    }
+  }
+
+  async function handleUpdateSet(
+    setId: string,
+    data: { weight?: number | null; reps?: number | null; rir?: number | null }
+  ) {
+    const result = await updateSet({ id: setId, ...data });
+    if (result.success) {
       queryClient.invalidateQueries({
         queryKey: ["workout-session", sessionId],
       });
@@ -191,9 +235,11 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
               sessionExerciseId={sessionExercise.id}
               sets={sessionExercise.sets}
               isUnilateral={sessionExercise.exercise.isUnilateral}
+              previousSets={previousSetsMap[sessionExercise.exercise.id]}
               onLogSet={(setNumber, data) =>
                 handleLogSet(sessionExercise.id, setNumber, data)
               }
+              onUpdateSet={handleUpdateSet}
               onDeleteSet={handleDeleteSet}
             />
           </section>

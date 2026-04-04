@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import Image from "next/image";
 import { TopBar } from "@/components/layout/top-bar";
 import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,11 @@ export function ProfileScreen({ user }: ProfileScreenProps) {
         <div className="flex flex-col items-center gap-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
             {user.image ? (
-              <img
+              <Image
                 src={user.image}
                 alt={user.name ?? ""}
+                width={80}
+                height={80}
                 className="h-20 w-20 rounded-full object-cover"
               />
             ) : (

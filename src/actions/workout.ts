@@ -212,6 +212,72 @@ export async function addExerciseToSession(
   return { success: true as const, data: sessionExercise };
 }
 
+export async function getWorkoutType(id: string) {
+  const userId = await getAuthUserId();
+
+  return db.workoutType.findFirst({
+    where: { id, userId },
+    include: {
+      templateExercises: {
+        include: { exercise: true },
+        orderBy: { order: "asc" },
+      },
+      _count: { select: { sessions: true } },
+    },
+  });
+}
+
+export async function getWeeklyStats() {
+  const userId = await getAuthUserId();
+
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [weekCount, monthCount] = await Promise.all([
+    db.workoutSession.count({
+      where: {
+        userId,
+        endedAt: { not: null },
+        startedAt: { gte: monday },
+      },
+    }),
+    db.workoutSession.count({
+      where: {
+        userId,
+        endedAt: { not: null },
+        startedAt: { gte: firstOfMonth },
+      },
+    }),
+  ]);
+
+  return { weekCount, monthCount };
+}
+
+export async function getWorkoutDates(weekStart: string) {
+  const userId = await getAuthUserId();
+
+  const start = new Date(weekStart);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+
+  const sessions = await db.workoutSession.findMany({
+    where: {
+      userId,
+      endedAt: { not: null },
+      startedAt: { gte: start, lt: end },
+    },
+    select: { startedAt: true },
+  });
+
+  return sessions.map((s) => s.startedAt.toISOString().split("T")[0]);
+}
+
 export async function removeExerciseFromSession(sessionExerciseId: string) {
   const userId = await getAuthUserId();
 

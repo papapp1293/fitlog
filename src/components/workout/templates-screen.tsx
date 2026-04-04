@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, ChevronRight, Trash2 } from "lucide-react";
+import Link from "next/link";
 import {
   getWorkoutTypes,
   createWorkoutType,
@@ -119,39 +120,42 @@ function TemplateCard({
     .join(", ");
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-semibold truncate">{template.name}</p>
-          <span className="text-xs text-muted-foreground shrink-0">
-            {template._count.sessions} sessions
-          </span>
+    <Link href={`/templates/${template.id}`}>
+      <div className="flex items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold truncate">{template.name}</p>
+            <span className="text-xs text-muted-foreground shrink-0">
+              {template._count.sessions} sessions
+            </span>
+          </div>
+          {exerciseNames && (
+            <p className="mt-1 text-sm text-muted-foreground truncate">
+              {exerciseNames}
+            </p>
+          )}
+          {template.templateExercises.length === 0 && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              No exercises added
+            </p>
+          )}
         </div>
-        {exerciseNames && (
-          <p className="mt-1 text-sm text-muted-foreground truncate">
-            {exerciseNames}
-          </p>
-        )}
-        {template.templateExercises.length === 0 && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            No exercises added
-          </p>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+          disabled={isPending}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startTransition(onDelete);
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-        disabled={isPending}
-        onClick={(e) => {
-          e.stopPropagation();
-          startTransition(onDelete);
-        }}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-    </div>
+    </Link>
   );
 }
 

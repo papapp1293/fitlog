@@ -3,14 +3,18 @@
 import { useEffect, useState } from "react";
 import { useWorkoutStore } from "@/stores/workout-store";
 
+function calcRemaining(restTimerEnd: number | null) {
+  if (!restTimerEnd) return 0;
+  return Math.max(0, Math.ceil((restTimerEnd - Date.now()) / 1000));
+}
+
 export function useRestTimer() {
   const restTimerEnd = useWorkoutStore((s) => s.restTimerEnd);
   const clearRestTimer = useWorkoutStore((s) => s.clearRestTimer);
-  const [remaining, setRemaining] = useState(0);
+  const [remaining, setRemaining] = useState(() => calcRemaining(restTimerEnd));
 
   useEffect(() => {
     if (!restTimerEnd) {
-      setRemaining(0);
       return;
     }
 
@@ -25,10 +29,13 @@ export function useRestTimer() {
     return () => clearInterval(id);
   }, [restTimerEnd, clearRestTimer]);
 
-  const isActive = remaining > 0;
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
+  // Derive display value without setState in effect body
+  const displayRemaining = restTimerEnd ? remaining : 0;
+
+  const isActive = displayRemaining > 0;
+  const minutes = Math.floor(displayRemaining / 60);
+  const seconds = displayRemaining % 60;
   const formatted = `${minutes}:${String(seconds).padStart(2, "0")}`;
 
-  return { remaining, isActive, formatted };
+  return { remaining: displayRemaining, isActive, formatted };
 }
