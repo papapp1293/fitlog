@@ -9,6 +9,7 @@ import Link from "next/link";
 import { getWeeklyStats, getWorkoutDates } from "@/actions/workout";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useWorkoutTimer } from "@/hooks/use-workout-timer";
+import { HomeSkeleton } from "@/components/skeletons/home-skeleton";
 
 function getMonday() {
   const today = new Date();
@@ -24,15 +25,17 @@ export function HomeScreen() {
   const activeSessionId = useWorkoutStore((s) => s.activeSessionId);
   const { formatted: timerFormatted } = useWorkoutTimer();
 
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["weekly-stats"],
     queryFn: () => getWeeklyStats(),
   });
 
-  const { data: workoutDates = [] } = useQuery({
+  const { data: workoutDates = [], isLoading: datesLoading } = useQuery({
     queryKey: ["workout-dates", mondayStr],
     queryFn: () => getWorkoutDates(mondayStr),
   });
+
+  const isLoading = statsLoading || datesLoading;
 
   return (
     <>
@@ -44,6 +47,10 @@ export function HomeScreen() {
       </header>
 
       <PageContainer className="py-6 space-y-6">
+        {isLoading ? (
+          <HomeSkeleton />
+        ) : (
+        <>
         <WeeklyCalendar workoutDates={workoutDates} />
 
         {activeSessionId ? (
@@ -89,6 +96,8 @@ export function HomeScreen() {
             />
           </div>
         </section>
+        </>
+        )}
       </PageContainer>
     </>
   );

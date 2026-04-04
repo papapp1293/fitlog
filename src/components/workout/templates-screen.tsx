@@ -21,6 +21,7 @@ import {
   createWorkoutType,
   deleteWorkoutType,
 } from "@/actions/workout";
+import { TemplateListSkeleton } from "@/components/skeletons/template-list-skeleton";
 import { toast } from "sonner";
 
 interface TemplateItem {
@@ -45,12 +46,7 @@ export function TemplatesScreen() {
       <PageContainer className="py-4 space-y-4">
         <div className="space-y-2">
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-20 animate-pulse rounded-xl bg-muted"
-              />
-            ))
+            <TemplateListSkeleton />
           ) : templates.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">
               No templates yet. Create your first workout!

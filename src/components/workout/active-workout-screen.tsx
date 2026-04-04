@@ -22,6 +22,7 @@ import { useWorkoutStore } from "@/stores/workout-store";
 import { useWorkoutTimer } from "@/hooks/use-workout-timer";
 import { useRestTimer } from "@/hooks/use-rest-timer";
 import { SetTable } from "@/components/workout/set-table";
+import { WorkoutSkeleton } from "@/components/skeletons/workout-skeleton";
 import { toast } from "sonner";
 
 interface SessionExerciseData {
@@ -350,11 +351,7 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
       <>
         <TopBar title="Loading..." showBack />
         <PageContainer className="py-4">
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-32 animate-pulse rounded-xl bg-muted" />
-            ))}
-          </div>
+          <WorkoutSkeleton />
         </PageContainer>
       </>
     );
