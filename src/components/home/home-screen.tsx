@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dumbbell, Plus, Play, Timer } from "lucide-react";
 import Link from "next/link";
 import { getWeeklyStats, getWorkoutDates } from "@/actions/workout";
+import { getBodyweightLogs } from "@/actions/bodyweight";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useWorkoutTimer } from "@/hooks/use-workout-timer";
 import { HomeSkeleton } from "@/components/skeletons/home-skeleton";
+import { HomeBodyweightCard } from "@/components/home/home-bodyweight-card";
 
 function getMonday() {
   const today = new Date();
@@ -33,6 +35,11 @@ export function HomeScreen() {
   const { data: workoutDates = [], isLoading: datesLoading } = useQuery({
     queryKey: ["workout-dates", mondayStr],
     queryFn: () => getWorkoutDates(mondayStr),
+  });
+
+  const { data: bwLogs = [] } = useQuery<{ id: string; weight: number; date: Date }[]>({
+    queryKey: ["bodyweight-logs"],
+    queryFn: () => getBodyweightLogs(),
   });
 
   const isLoading = statsLoading || datesLoading;
@@ -96,6 +103,7 @@ export function HomeScreen() {
             />
           </div>
         </section>
+        <HomeBodyweightCard logs={bwLogs} />
         </>
         )}
       </PageContainer>

@@ -45,6 +45,7 @@ export function TemplateDetailScreen({ templateId }: { templateId: string }) {
       if (result.success) {
         setPickerOpen(false);
         queryClient.invalidateQueries({ queryKey: ["workout-type", templateId] });
+        queryClient.invalidateQueries({ queryKey: ["workout-types"] });
         toast.success("Exercise added");
       } else {
         toast.error(result.error);
@@ -57,6 +58,7 @@ export function TemplateDetailScreen({ templateId }: { templateId: string }) {
       const result = await removeExerciseFromTemplate(templateExerciseId);
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ["workout-type", templateId] });
+        queryClient.invalidateQueries({ queryKey: ["workout-types"] });
         toast.success("Exercise removed");
       } else {
         toast.error(result.error);

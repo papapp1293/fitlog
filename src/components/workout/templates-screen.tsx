@@ -73,11 +73,13 @@ export function TemplatesScreen() {
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button className="w-full gap-2" size="lg">
-              <Plus className="h-4 w-4" />
-              New Template
-            </Button>
+          <DialogTrigger
+            render={
+              <Button className="w-full gap-2" size="lg" />
+            }
+          >
+            <Plus className="h-4 w-4" />
+            New Template
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>

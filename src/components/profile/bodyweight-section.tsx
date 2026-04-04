@@ -22,6 +22,19 @@ import {
 import { BodyweightSkeleton } from "@/components/skeletons/bodyweight-skeleton";
 import { toast } from "sonner";
 
+// Explicit colors for dark-mode SVG (CSS vars don't work in inline SVG attributes with oklch)
+const CHART_COLORS = {
+  weight: "#60a5fa",   // blue-400
+  trend: "#34d399",    // emerald-400
+  grid: "rgba(255,255,255,0.1)",
+  axis: "#a1a1aa",     // zinc-400
+  tooltip: {
+    bg: "#27272a",     // zinc-800
+    border: "rgba(255,255,255,0.1)",
+    text: "#fafafa",   // zinc-50
+  },
+};
+
 interface BodyweightLog {
   id: string;
   weight: number;
@@ -56,8 +69,14 @@ function computeChartData(logs: BodyweightLog[]): ChartPoint[] {
   });
 }
 
+function getTodayString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function BodyweightSection() {
   const [weight, setWeight] = useState("");
+  const [date, setDate] = useState(getTodayString());
   const queryClient = useQueryClient();
 
   const { data: logs = [], isLoading } = useQuery<BodyweightLog[]>({
@@ -66,10 +85,11 @@ export function BodyweightSection() {
   });
 
   const logMutation = useMutation({
-    mutationFn: (input: { weight: number }) => logBodyweight(input),
+    mutationFn: (input: { weight: number; date?: string }) => logBodyweight(input),
     onSuccess: (result) => {
       if (result.success) {
         setWeight("");
+        setDate(getTodayString());
         queryClient.invalidateQueries({ queryKey: ["bodyweight-logs"] });
         toast.success("Weight logged");
       } else {
@@ -110,7 +130,7 @@ export function BodyweightSection() {
       toast.error("Enter a valid weight");
       return;
     }
-    logMutation.mutate({ weight: value });
+    logMutation.mutate({ weight: value, date: date || undefined });
   }
 
   if (isLoading) {
@@ -136,41 +156,45 @@ export function BodyweightSection() {
             <LineChart data={chartData}>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="hsl(var(--border))"
+                stroke={CHART_COLORS.grid}
               />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 11, fill: CHART_COLORS.axis }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
                 domain={["dataMin - 1", "dataMax + 1"]}
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{ fontSize: 11, fill: CHART_COLORS.axis }}
                 tickLine={false}
                 axisLine={false}
                 width={40}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
+                  backgroundColor: CHART_COLORS.tooltip.bg,
+                  border: `1px solid ${CHART_COLORS.tooltip.border}`,
                   borderRadius: "8px",
                   fontSize: "12px",
+                  color: CHART_COLORS.tooltip.text,
                 }}
+                labelStyle={{ color: CHART_COLORS.tooltip.text }}
+                itemStyle={{ color: CHART_COLORS.tooltip.text }}
               />
               <Line
                 type="monotone"
                 dataKey="weight"
-                stroke="hsl(var(--chart-1))"
+                stroke={CHART_COLORS.weight}
                 strokeWidth={2}
-                dot={{ r: 3, fill: "hsl(var(--chart-1))" }}
+                dot={{ r: 4, fill: CHART_COLORS.weight, stroke: CHART_COLORS.weight }}
+                activeDot={{ r: 6, fill: CHART_COLORS.weight, stroke: "#18181b", strokeWidth: 2 }}
                 name="Weight"
               />
               <Line
                 type="monotone"
                 dataKey="trend"
-                stroke="hsl(var(--chart-2))"
+                stroke={CHART_COLORS.trend}
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={false}
@@ -191,19 +215,28 @@ export function BodyweightSection() {
       )}
 
       {/* Input form */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="Weight (lbs)"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={logMutation.isPending}>
+            {logMutation.isPending ? "..." : "Log"}
+          </Button>
+        </div>
         <Input
-          type="number"
-          step="0.1"
-          min="0"
-          placeholder="Weight (lbs)"
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          className="flex-1"
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          max={getTodayString()}
+          className="w-full text-sm"
         />
-        <Button type="submit" disabled={logMutation.isPending}>
-          {logMutation.isPending ? "..." : "Log"}
-        </Button>
       </form>
 
       {/* Recent logs */}

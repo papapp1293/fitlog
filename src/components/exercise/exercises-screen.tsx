@@ -84,11 +84,13 @@ export function ExercisesScreen() {
         </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button className="w-full gap-2" size="lg">
-              <Plus className="h-4 w-4" />
-              New Exercise
-            </Button>
+          <DialogTrigger
+            render={
+              <Button className="w-full gap-2" size="lg" />
+            }
+          >
+            <Plus className="h-4 w-4" />
+            New Exercise
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -197,7 +199,7 @@ function CreateExerciseForm({ onSuccess }: { onSuccess: () => void }) {
           id="muscleGroup"
           value={muscleGroup}
           onChange={(e) => setMuscleGroup(e.target.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring [&>option]:bg-background [&>option]:text-foreground"
         >
           <option value="">None</option>
           {MUSCLE_GROUPS.map((mg) => (

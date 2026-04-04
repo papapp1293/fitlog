@@ -28,11 +28,20 @@ export async function logBodyweight(input: { weight: number; date?: string }) {
     return { success: false as const, error: parsed.error.issues[0].message };
   }
 
+  let logDate: Date;
+  if (parsed.data.date) {
+    // Parse as local date (noon) to avoid timezone shift showing previous day
+    const [y, m, d] = parsed.data.date.split("-").map(Number);
+    logDate = new Date(y, m - 1, d, 12, 0, 0);
+  } else {
+    logDate = new Date();
+  }
+
   const data = await db.bodyweightLog.create({
     data: {
       userId,
       weight: parsed.data.weight,
-      date: parsed.data.date ? new Date(parsed.data.date) : new Date(),
+      date: logDate,
     },
   });
 

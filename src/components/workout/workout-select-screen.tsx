@@ -80,24 +80,24 @@ export function WorkoutSelectScreen() {
           </div>
         ) : (
           templates.map((template) => {
-            const isEmpty = template.templateExercises.length === 0;
+            const exerciseCount = template.templateExercises.length;
             return (
               <button
                 key={template.id}
                 onClick={() => handleStart(template.id)}
-                disabled={isPending || isEmpty || !!activeSessionId}
+                disabled={isPending || !!activeSessionId}
                 className="w-full rounded-xl border bg-card p-5 text-left transition-colors hover:bg-accent active:scale-[0.98] disabled:opacity-50"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold">{template.name}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {isEmpty
-                        ? "Add exercises to this template first"
-                        : `${template.templateExercises.length} exercises`}
+                      {exerciseCount === 0
+                        ? "No exercises — add during workout"
+                        : `${exerciseCount} exercises`}
                     </p>
                   </div>
-                  <Play className={`h-6 w-6 ${isEmpty || activeSessionId ? "text-muted-foreground" : "text-primary"}`} />
+                  <Play className={`h-6 w-6 ${activeSessionId ? "text-muted-foreground" : "text-primary"}`} />
                 </div>
               </button>
             );

@@ -20,6 +20,18 @@ import type { ExerciseHistoryPoint } from "@/actions/history";
 import { ExerciseHistorySkeleton } from "@/components/skeletons/exercise-history-skeleton";
 import { Dumbbell, TrendingUp } from "lucide-react";
 
+const CHART_COLORS = {
+  volume: "#60a5fa",    // blue-400
+  bestWeight: "#f59e0b", // amber-400
+  grid: "rgba(255,255,255,0.1)",
+  axis: "#a1a1aa",      // zinc-400
+  tooltip: {
+    bg: "#27272a",
+    border: "rgba(255,255,255,0.1)",
+    text: "#fafafa",
+  },
+};
+
 interface ChartData {
   date: string;
   volume: number;
@@ -82,40 +94,38 @@ export function ExerciseHistoryScreen({
                   <LineChart data={chartData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
+                      stroke={CHART_COLORS.grid}
                     />
                     <XAxis
                       dataKey="date"
-                      tick={{
-                        fontSize: 11,
-                        fill: "hsl(var(--muted-foreground))",
-                      }}
+                      tick={{ fontSize: 11, fill: CHART_COLORS.axis }}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis
-                      tick={{
-                        fontSize: 11,
-                        fill: "hsl(var(--muted-foreground))",
-                      }}
+                      tick={{ fontSize: 11, fill: CHART_COLORS.axis }}
                       tickLine={false}
                       axisLine={false}
                       width={45}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
+                        backgroundColor: CHART_COLORS.tooltip.bg,
+                        border: `1px solid ${CHART_COLORS.tooltip.border}`,
                         borderRadius: "8px",
                         fontSize: "12px",
+                        color: CHART_COLORS.tooltip.text,
                       }}
+                      labelStyle={{ color: CHART_COLORS.tooltip.text }}
+                      itemStyle={{ color: CHART_COLORS.tooltip.text }}
                     />
                     <Line
                       type="monotone"
                       dataKey="volume"
-                      stroke="hsl(var(--chart-1))"
+                      stroke={CHART_COLORS.volume}
                       strokeWidth={2}
-                      dot={{ r: 3, fill: "hsl(var(--chart-1))" }}
+                      dot={{ r: 4, fill: CHART_COLORS.volume, stroke: CHART_COLORS.volume }}
+                      activeDot={{ r: 6, fill: CHART_COLORS.volume, stroke: "#18181b", strokeWidth: 2 }}
                       name="Volume (lbs)"
                     />
                   </LineChart>
@@ -134,40 +144,38 @@ export function ExerciseHistoryScreen({
                   <LineChart data={chartData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(var(--border))"
+                      stroke={CHART_COLORS.grid}
                     />
                     <XAxis
                       dataKey="date"
-                      tick={{
-                        fontSize: 11,
-                        fill: "hsl(var(--muted-foreground))",
-                      }}
+                      tick={{ fontSize: 11, fill: CHART_COLORS.axis }}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis
-                      tick={{
-                        fontSize: 11,
-                        fill: "hsl(var(--muted-foreground))",
-                      }}
+                      tick={{ fontSize: 11, fill: CHART_COLORS.axis }}
                       tickLine={false}
                       axisLine={false}
                       width={45}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
+                        backgroundColor: CHART_COLORS.tooltip.bg,
+                        border: `1px solid ${CHART_COLORS.tooltip.border}`,
                         borderRadius: "8px",
                         fontSize: "12px",
+                        color: CHART_COLORS.tooltip.text,
                       }}
+                      labelStyle={{ color: CHART_COLORS.tooltip.text }}
+                      itemStyle={{ color: CHART_COLORS.tooltip.text }}
                     />
                     <Line
                       type="monotone"
                       dataKey="bestWeight"
-                      stroke="hsl(var(--chart-3))"
+                      stroke={CHART_COLORS.bestWeight}
                       strokeWidth={2}
-                      dot={{ r: 3, fill: "hsl(var(--chart-3))" }}
+                      dot={{ r: 4, fill: CHART_COLORS.bestWeight, stroke: CHART_COLORS.bestWeight }}
+                      activeDot={{ r: 6, fill: CHART_COLORS.bestWeight, stroke: "#18181b", strokeWidth: 2 }}
                       name="Best Weight (lbs)"
                     />
                   </LineChart>
