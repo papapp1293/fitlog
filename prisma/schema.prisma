@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,159 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        AuthSession[]
+  workoutTypes    WorkoutType[]
+  exercises       Exercise[]
+  workoutSessions WorkoutSession[]
+  bodyweightLogs  BodyweightLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model AuthSession {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model WorkoutType {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateExercises TemplateExercise[]
+  sessions          WorkoutSession[]
+
+  @@index([userId])
+}
+
+model Exercise {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  isUnilateral Boolean  @default(false)
+  muscleGroup  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateExercises TemplateExercise[]
+  sessionExercises  SessionExercise[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model TemplateExercise {
+  id            String @id @default(cuid())
+  workoutTypeId String
+  exerciseId    String
+  order         Int
+
+  workoutType WorkoutType @relation(fields: [workoutTypeId], references: [id], onDelete: Cascade)
+  exercise    Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([workoutTypeId])
+}
+
+model WorkoutSession {
+  id            String    @id @default(cuid())
+  userId        String
+  workoutTypeId String
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  notes         String?
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutType WorkoutType       @relation(fields: [workoutTypeId], references: [id], onDelete: Cascade)
+  exercises   SessionExercise[]
+
+  @@index([userId])
+  @@index([userId, startedAt])
+}
+
+model SessionExercise {
+  id         String  @id @default(cuid())
+  sessionId  String
+  exerciseId String
+  order      Int
+  notes      String?
+
+  session  WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  sets     SetEntry[]
+
+  @@index([sessionId])
+}
+
+model SetEntry {
+  id                String   @id @default(cuid())
+  sessionExerciseId String
+  setNumber         Int
+  weight            Float?
+  reps              Int?
+  rir               Int?
+  side              String?
+  completed         Boolean  @default(false)
+  loggedAt          DateTime @default(now())
+
+  sessionExercise SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+
+  @@index([sessionExerciseId])
+}
+
+model BodyweightLog {
+  id     String   @id @default(cuid())
+  userId String
+  weight Float
+  date   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
