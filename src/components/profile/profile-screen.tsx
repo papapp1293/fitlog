@@ -6,6 +6,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
+import { BodyweightSection } from "@/components/profile/bodyweight-section";
 
 interface ProfileScreenProps {
   user: {
@@ -38,6 +39,10 @@ export function ProfileScreen({ user }: ProfileScreenProps) {
             <h2 className="text-xl font-semibold">{user.name ?? "User"}</h2>
             <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
+        </div>
+
+        <div className="border-t pt-6">
+          <BodyweightSection />
         </div>
 
         <Button
