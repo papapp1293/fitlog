@@ -2,7 +2,7 @@
 
 A full-stack progressive web app for logging and tracking gym workouts. Built with a modern production-ready stack — server-side rendering, real-time optimistic updates, offline support, and data visualizations.
 
-**[Live Demo](https://your-app.vercel.app)** <!-- update after deploy -->
+**[Live Demo](https://fitlog2-one.vercel.app)**
 
 ![Next.js](https://img.shields.io/badge/Next.js_15-black?style=flat&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
@@ -113,6 +113,3 @@ src/
 └── lib/              # DB client, auth config, utilities
 ```
 
-## Screenshots
-
-<!-- Add screenshots after deploy -->
