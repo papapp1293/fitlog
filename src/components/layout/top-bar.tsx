@@ -41,10 +41,10 @@ export function TopBar({ title, showBack, actions, rightContent, sticky = true }
 
         {actions && actions.length > 0 && (
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" />}
+            >
+              <MoreVertical className="h-5 w-5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {actions.map((action) => (

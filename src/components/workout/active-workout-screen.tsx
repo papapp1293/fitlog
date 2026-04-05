@@ -287,6 +287,7 @@ export function ActiveWorkoutScreen({ sessionId }: { sessionId: string }) {
         clearActiveSession();
         queryClient.invalidateQueries({ queryKey: ["weekly-stats"] });
         queryClient.invalidateQueries({ queryKey: ["workout-dates"] });
+        queryClient.invalidateQueries({ queryKey: ["workout-history"] });
         toast.success("Workout complete!");
         router.push("/");
       } else {

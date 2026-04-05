@@ -77,3 +77,131 @@ export async function getExerciseById(exerciseId: string) {
     where: { id: exerciseId, userId },
   });
 }
+
+export interface WorkoutHistoryItem {
+  id: string;
+  workoutTypeName: string;
+  startedAt: string;
+  endedAt: string;
+  durationMinutes: number;
+  exerciseCount: number;
+  totalSets: number;
+  totalVolume: number;
+}
+
+export async function getWorkoutHistory(): Promise<WorkoutHistoryItem[]> {
+  const userId = await getAuthUserId();
+
+  const sessions = await db.workoutSession.findMany({
+    where: {
+      userId,
+      endedAt: { not: null },
+    },
+    include: {
+      workoutType: { select: { name: true } },
+      exercises: {
+        include: {
+          sets: { where: { completed: true } },
+        },
+      },
+    },
+    orderBy: { startedAt: "desc" },
+  });
+
+  return sessions.map((s) => {
+    let totalSets = 0;
+    let totalVolume = 0;
+
+    for (const ex of s.exercises) {
+      totalSets += ex.sets.length;
+      for (const set of ex.sets) {
+        totalVolume += (set.weight ?? 0) * (set.reps ?? 0);
+      }
+    }
+
+    const durationMinutes = Math.round(
+      (s.endedAt!.getTime() - s.startedAt.getTime()) / 60000
+    );
+
+    return {
+      id: s.id,
+      workoutTypeName: s.workoutType.name,
+      startedAt: s.startedAt.toISOString(),
+      endedAt: s.endedAt!.toISOString(),
+      durationMinutes,
+      exerciseCount: s.exercises.length,
+      totalSets,
+      totalVolume: Math.round(totalVolume),
+    };
+  });
+}
+
+export interface WorkoutSessionDetail {
+  id: string;
+  workoutTypeName: string;
+  startedAt: string;
+  endedAt: string;
+  durationMinutes: number;
+  notes: string | null;
+  exercises: {
+    id: string;
+    name: string;
+    isUnilateral: boolean;
+    sets: {
+      setNumber: number;
+      weight: number | null;
+      reps: number | null;
+      rir: number | null;
+      side: string | null;
+      completed: boolean;
+    }[];
+  }[];
+}
+
+export async function getWorkoutSessionDetail(
+  sessionId: string
+): Promise<WorkoutSessionDetail | null> {
+  const userId = await getAuthUserId();
+
+  const session = await db.workoutSession.findFirst({
+    where: { id: sessionId, userId, endedAt: { not: null } },
+    include: {
+      workoutType: { select: { name: true } },
+      exercises: {
+        include: {
+          exercise: { select: { name: true, isUnilateral: true } },
+          sets: { orderBy: { setNumber: "asc" } },
+        },
+        orderBy: { order: "asc" },
+      },
+    },
+  });
+
+  if (!session) return null;
+
+  const durationMinutes = Math.round(
+    (session.endedAt!.getTime() - session.startedAt.getTime()) / 60000
+  );
+
+  return {
+    id: session.id,
+    workoutTypeName: session.workoutType.name,
+    startedAt: session.startedAt.toISOString(),
+    endedAt: session.endedAt!.toISOString(),
+    durationMinutes,
+    notes: session.notes,
+    exercises: session.exercises.map((ex) => ({
+      id: ex.id,
+      name: ex.exercise.name,
+      isUnilateral: ex.exercise.isUnilateral,
+      sets: ex.sets.map((s) => ({
+        setNumber: s.setNumber,
+        weight: s.weight,
+        reps: s.reps,
+        rir: s.rir,
+        side: s.side,
+        completed: s.completed,
+      })),
+    })),
+  };
+}
